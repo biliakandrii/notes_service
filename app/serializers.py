@@ -1,4 +1,3 @@
-# myapp/serializers.py
 from rest_framework import serializers
 from app.models import Note, NoteAuthor, User
 

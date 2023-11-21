@@ -14,11 +14,11 @@ class UserView(View):
         if user_id:
             user = get_object_or_404(User, pk=user_id)
             serializer = UserSerializer(user)
-            return JsonResponse(serializer.data, safe=False)
+            return JsonResponse(serializer.data,  status=201, safe=False)
         else:
             users = User.objects.all()
             serializer = UserSerializer(users, many=True)
-            return JsonResponse(serializer.data, safe=False)
+            return JsonResponse(serializer.data,  status=201, safe=False)
 
     def post(self, request):
         try:
@@ -42,7 +42,7 @@ class NoteView(View):
     def get(self, request, note_id):
         note = get_object_or_404(Note, pk=note_id)
         serializer = NoteSerializer(note)
-        return JsonResponse(serializer.data, safe=False)
+        return JsonResponse(serializer.data,  status=201,  safe=False)
 
     def post(self, request):
         try:
