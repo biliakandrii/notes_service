@@ -7,6 +7,10 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = '__all__'
 
+    def create(self, validated_data):
+        validated_data['numberOfNotes'] = 0  # Set numberOfNotes to 0
+        return super().create(validated_data)
+
 class NoteSerializer(serializers.ModelSerializer):
     authors = serializers.SerializerMethodField()
 
