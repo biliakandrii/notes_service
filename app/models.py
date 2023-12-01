@@ -6,7 +6,7 @@ class User(models.Model):
     username = models.CharField(max_length=50)
     email = models.EmailField()
     password = models.CharField(max_length=50)
-    numberOfNotes = models.IntegerField(default=0) #fix
+    numberOfNotes = models.IntegerField(default=0)
 
     def __str__(self):
         return self.username
@@ -15,7 +15,7 @@ class User(models.Model):
 class Note(models.Model):
     header = models.CharField(max_length=255)
     body = models.TextField()
-    authors = models.ManyToManyField('User', through='NoteAuthor')  #fix
+    authors = models.ManyToManyField('User', through='NoteAuthor')
 
     def get_author_ids(self):
         return list(self.authors.values_list('pk', flat=True))
