@@ -1,103 +1,69 @@
-from django.db import transaction
-from django.shortcuts import get_object_or_404, render
-from django.http import JsonResponse, HttpResponseNotFound
-from django.views import View
+from rest_framework import generics, permissions
+from django.shortcuts import render
+from app.models import User, Note, NoteAuthor
+from .serializers import UserSerializer, NoteSerializer,NoteAuthorSerializer
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from django.http import JsonResponse, HttpResponseNotFound
+from django.views import View
+from django.shortcuts import get_object_or_404
+from django.db import transaction
 import json
-from app.models import User, Note, NoteAuthor
-from .serializers import UserSerializer, NoteSerializer
+from rest_framework import generics, status
+from rest_framework.response import Response
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-class UserView(View):
-    def get(self, request, user_id=None):
-        if user_id:
-            user = get_object_or_404(User, pk=user_id)
-            return render(request, 'user_detail.html', {'user': user})
-        else:
-            users = User.objects.all()
-            return render(request, 'user_list.html', {'users': users})
+class UserListCreateView(generics.ListCreateAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
 
-    def post(self, request):
-        data = json.loads(request.body)
-        serializer = UserSerializer(data=data)
+class UserRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+
+        # Retrieve the count of related notes
+        note_count = instance.noteauthor_set.count()
+
+        # Add the note_count to the serialized data
+        serialized_data = serializer.data
+        serialized_data['note_count'] = note_count
+
+        return Response(serialized_data)
+
+class NoteCreateView(generics.CreateAPIView):
+    queryset = Note.objects.all()
+    serializer_class = NoteSerializer
+
+
+class NoteRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Note.objects.all()
+    serializer_class = NoteSerializer
+
+class NoteAuthorCreateView(generics.CreateAPIView):
+    queryset = NoteAuthor.objects.all()
+    serializer_class = NoteAuthorSerializer
+
+    def post(self, request, *args, **kwargs):
+        user_id = request.data.get('user')
+        note_id = request.data.get('note')
+        permission = request.data.get('permission')
+
+        # You may want to add additional validation for user, note, and permission data
+
+        serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
+            # Check if the relationship already exists
+            if NoteAuthor.objects.filter(user_id=user_id, note_id=note_id).exists():
+                return Response({'detail': 'Relationship already exists'}, status=status.HTTP_400_BAD_REQUEST)
+
             serializer.save()
-            return render(request, 'user_detail.html', {'user': serializer.data}, status=201)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
-            return render(request, 'user_form.html', {'form_errors': serializer.errors})
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-    def delete(self, request, user_id):
-        user = get_object_or_404(User, pk=user_id)
-        user.delete()
-        return HttpResponseNotFound('<h1>User deleted successfully</h1>', status=204)
 
-
-@method_decorator(csrf_exempt, name='dispatch')
-class NoteView(View):
-    def get(self, request, note_id):
-        note = get_object_or_404(Note, pk=note_id)
-        return render(request, 'note_detail.html', {'note': note})
-
-    def post(self, request):
-        data = json.loads(request.body)
-        authors_data = data.pop('authors', [])
-        permission_data = data.pop('permissions', [])
-
-        with transaction.atomic():
-            serializer = NoteSerializer(data=data)
-            if serializer.is_valid():
-                note = serializer.save()
-                note.authors.set(authors_data)
-                if len(authors_data) != len(permission_data):
-                    return JsonResponse(serializer.errors, status=400)
-                for author, permission in zip(authors_data, permission_data):
-                    note_author = get_object_or_404(NoteAuthor, user_id=author, note_id=note.id)
-                    note_author.permission = permission
-                    note_author.save()
-                    author_ = get_object_or_404(User, pk=author)
-                    author_.numberOfNotes += 1
-                    author_.save()
-
-                note.refresh_from_db()
-                return render(request, 'note_detail.html', {'note': serializer.data})
-            else:
-                return render(request, 'note_form.html', {'form_errors': serializer.errors})
-
-
-    def put(self, request, note_id):
-        data = json.loads(request.body)
-        authors_data = data.pop('authors', [])
-        permission_data = data.pop('permissions', [])
-
-        with transaction.atomic():
-            note = get_object_or_404(Note, pk=note_id)
-            serializer = NoteSerializer(instance=note, data=data)
-            note.delete_authors()
-
-            if serializer.is_valid():
-                note = serializer.save()
-                note.authors.set(authors_data)
-                if len(authors_data) != len(permission_data):
-                    return JsonResponse(serializer.errors, status=400)
-                for author, permission in zip(authors_data, permission_data):
-                    note_author = get_object_or_404(NoteAuthor, user_id=author, note_id=note.id)
-                    note_author.permission = permission
-                    note_author.save()
-
-                    author_ = get_object_or_404(User, pk=author)
-                    author_.numberOfNotes += 1
-                    author_.save()
-
-                note.refresh_from_db()
-                return render(request, 'note_detail.html', {'note': NoteSerializer(note).data})
-            else:
-                return render(request, 'note_form.html', {'form_errors': serializer.errors})
-
-    def delete(self, request, note_id):
-        note = get_object_or_404(Note, pk=note_id)
-        note.delete_authors()
-        note.delete()
-        return HttpResponseNotFound('<h1>Note deleted successfully</h1>', status=204)

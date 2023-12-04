@@ -4,16 +4,12 @@ from .models import User, Note
 
 
 class UserAdmin(admin.ModelAdmin):
-    list_display = ('username', 'email', 'number_of_notes')
+    list_display = ('username', 'email')
     search_fields = ('username',)
-    list_filter = ('numberOfNotes',)
-    sortable_by = ('numberOfNotes',)
 
-    def number_of_notes(self, obj):
-        return obj.numberOfNotes
 
 class NoteAdmin(admin.ModelAdmin):
-    list_display = ('header', 'authors_')
+    list_display = ('header',)
     search_fields = ('header',)
 
 

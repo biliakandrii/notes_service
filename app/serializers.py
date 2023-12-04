@@ -3,13 +3,14 @@ from app.models import Note, NoteAuthor, User
 
 
 class UserSerializer(serializers.ModelSerializer):
+    note_count = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = User
-        fields = '__all__'
-
-    def create(self, validated_data):
-        validated_data['numberOfNotes'] = 0  # Set numberOfNotes to 0
-        return super().create(validated_data)
+        fields = ['id', 'username', 'email', 'password', 'note_count']
+        extra_kwargs = {
+            'password': {'write_only': True},  # Mark password as write-only during creation
+        }
 
 class NoteSerializer(serializers.ModelSerializer):
     authors = serializers.SerializerMethodField()
@@ -21,3 +22,9 @@ class NoteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Note
         fields = '__all__'
+
+
+class NoteAuthorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NoteAuthor
+        fields = ['user', 'note', 'permission']
