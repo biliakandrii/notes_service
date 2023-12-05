@@ -4,9 +4,7 @@ from .models import User, Note
 
 
 class UserAdmin(admin.ModelAdmin):
-    list_display = ('username', 'email')
-    search_fields = ('username',)
-
+    pass
 
 class NoteAdmin(admin.ModelAdmin):
     list_display = ('header',)

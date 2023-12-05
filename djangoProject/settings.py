@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'app',
 ]
 
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -83,7 +84,17 @@ DATABASES = {
     }
 }
 
+AUTH_USER_MODEL = 'app.User'
+# AUTHENTICATION_BACKENDS = [
+#     'app.models.User',
+#
+# ]
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'app.authentication_backends.CustomUserAuthenticationBackend',
+    'app.models.User',
 
+]
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
 

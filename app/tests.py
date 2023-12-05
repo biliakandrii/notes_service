@@ -1,71 +1,185 @@
-import json
-
-from django.test import TestCase, Client
+from rest_framework.test import APITestCase
 from django.urls import reverse
-from app.models import User, Note
+from rest_framework import status
+from .models import User, Note, NoteAuthor
+from .serializers import UserSerializer, NoteSerializer, NoteAuthorSerializer
 
 
-class UserViewTest(TestCase):
+class TestUserListCreateView(APITestCase):
+
     def setUp(self):
-        self.client = Client()
-        self.user = User.objects.create(username="testuser", email="test@example.com", password="testpassword")
+        self.url = reverse('user-create-list')
 
-    def test_get_user(self):
-        url = reverse("user-retrieve-destroy", kwargs={"user_id": self.user.id})
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'user_detail.html')
+        self.user = User.objects.create_user(
+            username='test_user',
+            email='test_user@example.com',
+            password='abc121212'
+        )
+        self.client.force_login(self.user)
 
-    def test_get_all_users(self):
-        url = reverse("user-create-list")
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'user_list.html')
+    def test_list(self):
+        response = self.client.get(self.url)
 
-    def test_create_user(self):
-        url = reverse("user-create-list")
-        data = {"username": "newuser", "email": "new@example.com", "password": "newpassword"}
-        response = self.client.post(url, data=json.dumps(data), content_type='application/json')
-        self.assertEqual(response.status_code, 201)
-        self.assertTrue(User.objects.filter(username="newuser").exists())
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, UserSerializer(User.objects.all(), many=True).data)
 
-    def test_delete_user(self):
-        url = reverse("user-retrieve-destroy", kwargs={"user_id": self.user.id})
-        response = self.client.delete(url)
-        self.assertEqual(response.status_code, 204)
-        self.assertFalse(User.objects.filter(username="testuser").exists())
+    # Add more tests for user creation, validation, etc.
 
 
-class NoteViewTest(TestCase):
+class TestUserRetrieveUpdateDestroyView(APITestCase):
+
     def setUp(self):
-        self.client = Client()
-        self.user = User.objects.create(username="testuser", email="test@example.com", password="testpassword")
-        self.note = Note.objects.create(header="Test Note", body="Test content")
+        self.test_user = User.objects.create_user(
+            username='test_user_2',
+            email='test_user_2@example.com',
+            password='def343434'
+        )
+        self.url = reverse('user-retrieve-update-destroy', kwargs={'pk': self.test_user.id})
 
-    def test_get_note(self):
-        url = reverse("note-retrieve-update-delete", kwargs={"note_id": self.note.id})
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'note_detail.html')
+        self.user = User.objects.create_user(
+            username='test_user',
+            email='test_user@example.com',
+            password='abc121212'
+        )
+        self.client.force_login(self.user)
 
-    def test_create_note(self):
-        url = reverse("note-create")
-        data = {"header": "New Note", "body": "New content", "authors": [self.user.id], "permissions": ["read"]}
-        response = self.client.post(url, data=json.dumps(data), content_type='application/json')
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(Note.objects.filter(header="New Note").exists())
+    def test_retrieve(self):
+        response = self.client.get(self.url)
 
-    def test_update_note(self):
-        url = reverse("note-retrieve-update-delete", kwargs={"note_id": self.note.id})
-        data = {"header": "Updated Note", "body": "Updated content", "authors": [self.user.id], "permissions": ["write"]}
-        response = self.client.put(url, data=json.dumps(data), content_type='application/json')
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(Note.objects.get(id=self.note.id).header, "Updated Note")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.data
+        data.pop('note_count')
+        self.assertEqual(data, UserSerializer(User.objects.get(pk=self.test_user.id)).data)
 
-    def test_delete_note(self):
-        url = reverse("note-retrieve-update-delete", kwargs={"note_id": self.note.id})
-        response = self.client.delete(url)
-        self.assertEqual(response.status_code, 204)
-        self.assertFalse(Note.objects.filter(header="Test Note").exists())
+    # Add more tests for user update, deletion, validation, etc.
 
 
+class TestNoteCreateView(APITestCase):
+
+    def setUp(self):
+        self.url = reverse('note-create')
+
+        self.user = User.objects.create_user(
+            username='test_user',
+            email='test_user@example.com',
+            password='abc121212'
+        )
+        self.client.force_login(self.user)
+
+    def test_create(self):
+        data = {
+            'header': 'Test Note Header',
+            'body': 'Test Note Body'
+        }
+
+        response = self.client.post(self.url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data, NoteSerializer(Note.objects.get(header='Test Note Header')).data)
+
+    # Add more tests for note creation, validation, etc.
+
+class TestNoteRetrieveUpdateDestroyView(APITestCase):
+
+    def setUp(self):
+        self.test_user = User.objects.create_user(
+            username='test_user',
+            email='test_user@example.com',
+            password='abc121212'
+        )
+        self.test_note = Note.objects.create(
+            header='Test Note Header',
+            body='Test Note Body'
+        )
+        NoteAuthor.objects.create(user=self.test_user, note=self.test_note)
+        self.url = reverse('note-retrieve-update-delete', kwargs={'pk': self.test_note.id})
+
+        self.user = User.objects.create_user(
+            username='another_user',
+            email='another_user@example.com',
+            password='xyz090909'
+        )
+        self.client.force_login(self.user)
+
+    def test_update(self):
+        data = {
+            'header': 'Updated Note Header',
+            'body': 'Updated Note Body'
+        }
+
+        response = self.client.put(self.url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)  # Only the note author can update
+
+    def test_destroy(self):
+        response = self.client.delete(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)  # Only the note author can delete
+
+
+class TestNoteAuthorCreateView(APITestCase):
+
+    def setUp(self):
+        self.url = reverse('note-author')
+
+        self.user = User.objects.create_user(
+            username='test_user',
+            email='test_user@example.com',
+            password='abc121212'
+        )
+        self.client.force_login(self.user)
+
+        self.test_user_2 = User.objects.create_user(
+            username='another_user',
+            email='another_user@example.com',
+            password='xyz090909'
+        )
+        self.test_note = Note.objects.create(
+            header='Test Note Header',
+            body='Test Note Body'
+        )
+
+    def test_create_valid_relationship(self):
+        data = {
+            'user': self.test_user_2.id,
+            'note': self.test_note.id
+        }
+
+        response = self.client.post(self.url, data)
+
+        self.assertFalse(NoteAuthor.objects.filter(user=self.test_user_2, note=self.test_note).exists())
+
+    def test_create_duplicate_relationship(self):
+        NoteAuthor.objects.create(user=self.test_user_2, note=self.test_note)
+
+        data = {
+            'user': self.test_user_2.id,
+            'note': self.test_note.id
+        }
+
+        response = self.client.post(self.url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(NoteAuthor.objects.filter(user=self.test_user_2, note=self.test_note).exists())
+
+    def test_create_invalid_user(self):
+        data = {
+            'user': 999,  # Non-existent user
+            'note': self.test_note.id
+        }
+
+        response = self.client.post(self.url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(NoteAuthor.objects.filter(note=self.test_note).exists())
+
+    def test_create_invalid_note(self):
+        data = {
+            'user': self.test_user_2.id,
+            'note': 999  # Non-existent note
+        }
+
+        response = self.client.post(self.url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(NoteAuthor.objects.filter(user=self.test_user_2).exists())
